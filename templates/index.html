@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PDF OCR Stream</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <main class="shell">
+        <section class="hero panel">
+            <div>
+                <p class="eyebrow">Flask OCR Workspace</p>
+                <h1>Upload a PDF, choose pages, and watch the transcription stream live.</h1>
+                <p class="lede">
+                    The page previews stay visible while the Ollama response streams token by token,
+                    and completed output can be downloaded as per-page TXT files in a ZIP or as a DOCX with page breaks.
+                </p>
+            </div>
+            <div class="hero-meta">
+                <span class="pill">Streaming OCR</span>
+                <span class="pill">Page Selection</span>
+                <span class="pill">TXT + DOCX Export</span>
+            </div>
+        </section>
+
+        <section class="panel upload-panel">
+            <form id="uploadForm" class="upload-form">
+                <label class="file-picker" for="pdfInput">
+                    <span>Select PDF</span>
+                    <input id="pdfInput" name="pdf" type="file" accept="application/pdf" required>
+                </label>
+                <button id="uploadButton" type="submit">Upload PDF</button>
+            </form>
+            <p id="uploadStatus" class="status-text">Choose a PDF to start.</p>
+        </section>
+
+        <section id="selectionPanel" class="panel" hidden>
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Step 2</p>
+                    <h2>Select pages to transcribe</h2>
+                </div>
+                <div class="toolbar">
+                    <button id="selectAllButton" type="button" class="secondary">Select all</button>
+                    <button id="clearAllButton" type="button" class="secondary">Clear all</button>
+                    <button id="startButton" type="button">Start transcription</button>
+                </div>
+            </div>
+            <p id="selectionSummary" class="status-text"></p>
+            <div id="pageGrid" class="page-grid"></div>
+        </section>
+
+        <section id="livePanel" class="panel live-panel" hidden>
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Step 3</p>
+                    <h2>Live transcription stream</h2>
+                </div>
+                <div id="jobState" class="pill subtle">Waiting</div>
+            </div>
+
+            <div class="live-layout">
+                <aside class="preview-pane">
+                    <p id="currentPageLabel" class="status-text">No page is being processed yet.</p>
+                    <img id="currentPagePreview" alt="Current page preview" hidden>
+                </aside>
+                <section class="stream-pane">
+                    <div id="streamStatus" class="stream-status">The stream will appear here after the job starts.</div>
+                    <div id="streamedPages" class="streamed-pages"></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="downloadPanel" class="panel download-panel" hidden>
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Downloads</p>
+                    <h2>Export the completed transcription</h2>
+                </div>
+            </div>
+            <div class="download-actions">
+                <a id="downloadTxt" class="download-link" href="#">Download TXT ZIP</a>
+                <a id="downloadDocx" class="download-link" href="#">Download DOCX</a>
+            </div>
+        </section>
+    </main>
+
+    <template id="pageCardTemplate">
+        <label class="page-card">
+            <input type="checkbox" class="page-checkbox">
+            <div class="page-card-body">
+                <img class="page-card-image" alt="PDF page preview">
+                <div class="page-card-footer">
+                    <strong class="page-card-title"></strong>
+                    <span class="page-card-status">Ready</span>
+                </div>
+            </div>
+        </label>
+    </template>
+
+    <template id="streamBlockTemplate">
+        <article class="stream-block">
+            <div class="stream-block-head">
+                <h3></h3>
+                <span class="pill subtle">Streaming</span>
+            </div>
+            <div class="stream-output"></div>
+        </article>
+    </template>
+
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
