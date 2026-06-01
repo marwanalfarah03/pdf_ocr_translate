@@ -79,6 +79,10 @@ then transcribe the footer.
 - Use these separators only when real header/footer text is present.
 
 Return transcription only.
+
+Think briefly only to identify reading order, headers, footers, and tables.
+Do not perform extended reasoning.
+Keep internal reasoning minimal and begin final transcription as soon as possible.
 """.strip()
 
 
