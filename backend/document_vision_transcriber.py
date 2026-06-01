@@ -40,22 +40,43 @@ Rules:
 - Preserve Arabic, English, numbers, punctuation, symbols, bullets, parentheses, slashes, and diacritics exactly when visible.
 - Keep Arabic in logical reading order.
 - Use [unclear] for unreadable words or spans.
-- Ignore text inside logos, seals, icons, decorative watermarks, and background graphics unless clearly part of the document content.
+- Ignore logos, stamps, seals, icons, emblems, QR/barcode labels, decorative marks, signature stamps, background graphics, and watermarks.
+- Do not transcribe text that is part of a logo, stamp, seal, watermark, decorative emblem, or background design, even if it is readable.
+- If a logo/stamp/seal overlaps real document text, transcribe the real document text when readable; use [unclear] only for the obscured real text.
 - Follow the natural reading order of the page.
 - For multi-column layouts, read each column in its natural order.
 - Keep headings, titles, bullets, numbered items, clauses, form fields, and table rows clearly separated.
 - Join lines that are only visual wrapping inside the same sentence or field.
 - If a label and value appear together, output: LABEL : VALUE.
-- For tables, use readable plain text. Use " | " between cells only when helpful.
 - Never output a term or label alone if its definition/value continues beside or below it.
 
+Tables:
+- If content is arranged as a table, output it as an ASCII box table.
+- Use only +, -, and | for borders. Include a top border, one row per visual row, separator borders between rows, and a bottom border.
+- Start and end every table row with |. Put one space of padding on each side of each cell value.
+- Make each column wide enough for the longest visible cell in that column.
+- Keep cells in the visual column order. Preserve Arabic text in logical reading order inside each cell.
+- Leave empty cells blank. Use [unclear] only when a visible cell value cannot be read.
+- For merged cells, place the text in the first covered cell and leave the other covered cells blank.
+- Use this exact style:
++------------+------------+
+| Header 1   | Header 2   |
++------------+------------+
+| Value 1    | Value 2    |
++------------+------------+
+
 Headers and footers:
-- If a visually distinct running header appears above the main content, transcribe it, then output exactly:
+- Always inspect the top margin area before the body text. Running headers may be small, faint, separated by a line, or repeated across pages.
+- Treat printed text in the top margin as a header when it is separate from the body, including document titles, reference codes, dates, page identifiers, department names, or institution names.
+- If a clear running header appears above the main content, transcribe only its real printed text, then output exactly:
 {HEADER_SEPARATOR}
-- If a visually distinct footer appears below the main content, output exactly:
+- Always inspect the bottom margin area after the body text. Running footers may include page numbers, references, dates, confidentiality notes, addresses, or repeated document metadata.
+- If a clear footer appears below the main content, output exactly:
 {FOOTER_SEPARATOR}
 then transcribe the footer.
-- Use these separators only for clear running headers/footers.
+- Do not treat logo-only, stamp-only, seal-only, watermark-only, or decorative margin content as a header or footer.
+- If header/footer text appears beside a logo or emblem, transcribe the text only and ignore the logo/emblem.
+- Use these separators only when real header/footer text is present.
 
 Return transcription only.
 """.strip()
@@ -67,11 +88,15 @@ Transcribe this page faithfully as plain text.
 The page may contain Arabic, English, mixed RTL/LTR text, tables, forms, boxes,
 signatures, lists, clauses, definitions, annexes, page numbers, or scanned content.
 
+Before writing the body, deliberately check the top margin for a running header.
+After writing the body, deliberately check the bottom margin for a running footer.
+Ignore logos, stamps, seals, decorative marks, and watermarks.
+
 Use this order:
-1. Clear running header if present, followed by:
+1. Real running header text if present, followed by:
    {HEADER_SEPARATOR}
-2. Main content in natural reading order.
-3. Clear footer if present, preceded by:
+2. Main content in natural reading order. Render tables as ASCII box tables.
+3. Real footer text if present, preceded by:
    {FOOTER_SEPARATOR}
 
 Return transcription only.
