@@ -196,6 +196,7 @@ function createStreamBlock(pageNumber, previewUrl) {
     const mountedOutput = mountedBlock.querySelector(".stream-output");
     const mountedPill = mountedBlock.querySelector(".pill");
     const mountedPreview = mountedBlock.querySelector(".stream-preview");
+    const mountedThinkingEl = mountedBlock.querySelector(".think-output");
     const mountedCurrentLine = mountedOutput.querySelector("p");
 
     const refs = {
@@ -204,6 +205,8 @@ function createStreamBlock(pageNumber, previewUrl) {
         pill: mountedPill,
         preview: mountedPreview,
         currentLine: mountedCurrentLine,
+        thinkingEl: mountedThinkingEl,
+        thinkCurrentLine: null,
     };
     state.streamBlocks.set(pageNumber, refs);
     return refs;
@@ -361,6 +364,36 @@ function handleJobEvent(event) {
         return;
     }
 
+    if (event.type === "think_token") {
+        const refs = createStreamBlock(event.page_number, "");
+        if (!refs.thinkCurrentLine) {
+            refs.thinkingEl.hidden = false;
+            const firstThinkLine = makeLine();
+            refs.thinkingEl.appendChild(firstThinkLine);
+            refs.thinkCurrentLine = firstThinkLine;
+        }
+        const parts = String(event.token || "").split("\n");
+        refs.thinkCurrentLine.textContent += parts[0];
+        for (let i = 1; i < parts.length; i++) {
+            const p = makeLine();
+            p.textContent = parts[i];
+            refs.thinkingEl.appendChild(p);
+            refs.thinkCurrentLine = p;
+        }
+        refs.thinkingEl.scrollTop = refs.thinkingEl.scrollHeight;
+        return;
+    }
+
+    if (event.type === "think_done") {
+        const refs = state.streamBlocks.get(event.page_number);
+        if (refs) {
+            refs.thinkingEl.hidden = true;
+            refs.thinkingEl.innerHTML = "";
+            refs.thinkCurrentLine = null;
+        }
+        return;
+    }
+
     if (event.type === "token") {
         const refs = createStreamBlock(event.page_number, "");
         const parts = String(event.token || "").split("\n");
@@ -377,6 +410,9 @@ function handleJobEvent(event) {
 
     if (event.type === "page_complete") {
         const refs = createStreamBlock(event.page_number, event.preview_url);
+        refs.thinkingEl.hidden = true;
+        refs.thinkingEl.innerHTML = "";
+        refs.thinkCurrentLine = null;
         renderLines(refs.output, event.text);
         refs.currentLine = refs.output.lastElementChild;
         refs.pill.textContent = "Complete";

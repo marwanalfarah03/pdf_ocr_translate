@@ -353,10 +353,18 @@ def _run_transcription_modes(job: JobRecord, upload: UploadRecord, output_dir: P
             def on_token(token: str, page_ref: int = page_number) -> None:
                 append_event(job, "token", page_number=page_ref, token=token)
 
+            def on_think_token(token: str, page_ref: int = page_number) -> None:
+                append_event(job, "think_token", page_number=page_ref, token=token)
+
+            def on_think_done(page_ref: int = page_number) -> None:
+                append_event(job, "think_done", page_number=page_ref)
+
             text = postprocess_page_text(
                 transcribe_image(
                     jpeg_bytes,
                     on_token=on_token,
+                    on_think_token=on_think_token,
+                    on_think_done=on_think_done,
                     print_tokens=False,
                     thinking_enabled=job.thinking_enabled,
                 )

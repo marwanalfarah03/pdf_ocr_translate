@@ -115,30 +115,11 @@ def rasterize_page(page: fitz.Page, dpi: int = DPI) -> bytes:
     return pix.tobytes("jpeg")
 
 
-def _visible_after_think_token(
-    token: str,
-    pending: list[str],
-    streaming_started: bool,
-) -> tuple[str, bool]:
-    """Return streamed text only after a closing think tag has appeared."""
-    if streaming_started:
-        return token, True
-
-    pending.append(token)
-    pending_text = "".join(pending)
-    pending_lower = pending_text.lower()
-
-    end_index = pending_lower.find(THINK_END_TAG)
-    if end_index >= 0:
-        pending.clear()
-        return pending_text[end_index + len(THINK_END_TAG):], True
-
-    return "", False
-
-
 def transcribe_image(
     jpeg_bytes: bytes,
     on_token: Optional[Callable[[str], None]] = None,
+    on_think_token: Optional[Callable[[str], None]] = None,
+    on_think_done: Optional[Callable[[], None]] = None,
     print_tokens: bool = True,
     thinking_enabled: bool = True,
 ) -> str:
@@ -222,11 +203,22 @@ def transcribe_image(
                 if token:
                     raw_text.append(token)
                     if thinking_enabled:
-                        visible_token, streaming_started = _visible_after_think_token(
-                            token,
-                            pending_think_text,
-                            streaming_started,
-                        )
+                        if not streaming_started:
+                            if on_think_token is not None:
+                                on_think_token(token)
+                            pending_think_text.append(token)
+                            pending_text = "".join(pending_think_text)
+                            end_index = pending_text.lower().find(THINK_END_TAG)
+                            if end_index >= 0:
+                                streaming_started = True
+                                pending_think_text.clear()
+                                if on_think_done is not None:
+                                    on_think_done()
+                                visible_token = pending_text[end_index + len(THINK_END_TAG):]
+                            else:
+                                continue
+                        else:
+                            visible_token = token
                     else:
                         visible_token = token
 

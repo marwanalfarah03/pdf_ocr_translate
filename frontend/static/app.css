@@ -363,6 +363,45 @@ button:disabled {
     border-bottom: 1px solid rgba(108, 76, 46, 0.08);
 }
 
+.stream-right {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.think-output {
+    padding: 10px 16px 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-size: 0.88rem;
+    font-style: italic;
+    color: #a09080;
+    background: rgba(240, 234, 224, 0.55);
+    border-bottom: 1px solid rgba(108, 76, 46, 0.1);
+}
+
+.think-output::before {
+    content: "Thinking…";
+    display: block;
+    font-style: normal;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #b8a898;
+    margin-bottom: 6px;
+    font-family: "Bahnschrift", "Segoe UI Variable Display", sans-serif;
+}
+
+.think-output p {
+    margin: 0;
+    padding: 1px 0;
+    line-height: 1.6;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
 .stream-output {
     margin: 0;
     padding: 16px;
