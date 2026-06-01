@@ -20,6 +20,10 @@ _TEXT_PART = re.compile(
 )
 _ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]")
 _MULTISPACE_RE = re.compile(r"\s+")
+TRANSLATED_DOCX_LANGUAGE = "en-US"
+HEADER_SEPARATOR = "---------- HEADER ----------"
+FOOTER_SEPARATOR = "---------- FOOTER ----------"
+SEPARATOR_LINES = {HEADER_SEPARATOR, FOOTER_SEPARATOR}
 
 DEFAULT_TRANSLATION_SYSTEM_PROMPT = """You are a professional document translator at a leading financial institution in Jordan, specialising in Corporate and Institutional Banking.
 
@@ -71,6 +75,50 @@ def _run_has_break(run: etree._Element) -> bool:
     return any(_local(child) == "br" for child in run)
 
 
+def _get_or_add_first_child(parent: etree._Element, tag_name: str) -> etree._Element:
+    child = parent.find(_w(tag_name))
+    if child is None:
+        child = etree.Element(_w(tag_name))
+        parent.insert(0, child)
+    return child
+
+
+def _set_xml_language(r_pr: etree._Element, language: str) -> None:
+    lang = r_pr.find(_w("lang"))
+    if lang is None:
+        lang = etree.SubElement(r_pr, _w("lang"))
+    lang.set(_w("val"), language)
+    lang.set(_w("eastAsia"), language)
+    lang.set(_w("bidi"), language)
+
+
+def _set_xml_ltr_run(run: etree._Element, language: str) -> None:
+    r_pr = _get_or_add_first_child(run, "rPr")
+    rtl = r_pr.find(_w("rtl"))
+    if rtl is None:
+        rtl = etree.SubElement(r_pr, _w("rtl"))
+    rtl.set(_w("val"), "0")
+    _set_xml_language(r_pr, language)
+
+
+def _set_xml_ltr_paragraph(paragraph: etree._Element, center: bool = False) -> None:
+    p_pr = _get_or_add_first_child(paragraph, "pPr")
+    bidi = p_pr.find(_w("bidi"))
+    if bidi is None:
+        bidi = etree.SubElement(p_pr, _w("bidi"))
+    bidi.set(_w("val"), "0")
+
+    jc = p_pr.find(_w("jc"))
+    if jc is None:
+        jc = etree.SubElement(p_pr, _w("jc"))
+
+    current_alignment = jc.get(_w("val"))
+    if center:
+        jc.set(_w("val"), "center")
+    elif current_alignment in {None, "right", "end"}:
+        jc.set(_w("val"), "left")
+
+
 def _iter_runs(para: etree._Element):
     wrappers = {"ins", "del", "hyperlink", "sdtContent", "sdt"}
 
@@ -84,6 +132,35 @@ def _iter_runs(para: etree._Element):
 
     for child in para:
         yield from _walk(child)
+
+
+def _paragraph_text(para: etree._Element) -> str:
+    return "".join(_run_text(run) for run in _iter_runs(para))
+
+
+def _apply_english_direction_and_language(root: etree._Element) -> None:
+    for paragraph in root.iter(_w("p")):
+        text = _paragraph_text(paragraph).strip()
+        _set_xml_ltr_paragraph(paragraph, center=text in SEPARATOR_LINES)
+        for run in _iter_runs(paragraph):
+            _set_xml_ltr_run(run, TRANSLATED_DOCX_LANGUAGE)
+
+
+def _apply_english_styles(xml_bytes: bytes) -> bytes:
+    root = etree.fromstring(xml_bytes)
+
+    for p_pr in root.iter(_w("pPr")):
+        bidi = p_pr.find(_w("bidi"))
+        if bidi is not None:
+            bidi.set(_w("val"), "0")
+
+    for r_pr in root.iter(_w("rPr")):
+        rtl = r_pr.find(_w("rtl"))
+        if rtl is not None:
+            rtl.set(_w("val"), "0")
+        _set_xml_language(r_pr, TRANSLATED_DOCX_LANGUAGE)
+
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
 class Line:
@@ -251,6 +328,7 @@ def _apply_translations_to_xml(xml_bytes: bytes, translations_by_id: Dict[int, s
                 line.translated = translated
                 _redistribute_translated_text(line)
 
+    _apply_english_direction_and_language(root)
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
@@ -266,6 +344,11 @@ def build_translated_docx(input_path: Path, output_path: Path, translations_by_i
             if _is_text_part(entry.filename):
                 try:
                     raw = _apply_translations_to_xml(raw, translations_by_id, state)
+                except etree.XMLSyntaxError:
+                    pass
+            elif entry.filename == "word/styles.xml":
+                try:
+                    raw = _apply_english_styles(raw)
                 except etree.XMLSyntaxError:
                     pass
             zout.writestr(entry, raw)

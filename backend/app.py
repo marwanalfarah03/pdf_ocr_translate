@@ -1,7 +1,6 @@
 import io
 import json
 import os
-import re
 import threading
 import time
 import zipfile
@@ -20,23 +19,33 @@ from werkzeug.utils import secure_filename
 
 try:
     from .history_store import HistoryStore
-    from .document_vision_transcriber import DPI, postprocess_page_text, rasterize_page, transcribe_image
+    from .document_vision_transcriber import (
+        DPI,
+        FOOTER_SEPARATOR,
+        HEADER_SEPARATOR,
+        postprocess_page_text,
+        rasterize_page,
+        transcribe_image,
+    )
     from .translation_pipeline import load_translation_settings, translate_docx_file
 except ImportError:
     from history_store import HistoryStore
-    from document_vision_transcriber import DPI, postprocess_page_text, rasterize_page, transcribe_image
+    from document_vision_transcriber import (
+        DPI,
+        FOOTER_SEPARATOR,
+        HEADER_SEPARATOR,
+        postprocess_page_text,
+        rasterize_page,
+        transcribe_image,
+    )
     from translation_pipeline import load_translation_settings, translate_docx_file
-
-_RTL_RE = re.compile(r"[֐-׿؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 
 MODE_TRANSCRIBE = "transcribe"
 MODE_TRANSCRIBE_TRANSLATE = "transcribe_translate"
 MODE_TRANSLATE_ONLY = "translate_only"
 SUPPORTED_MODES = {MODE_TRANSCRIBE, MODE_TRANSCRIBE_TRANSLATE, MODE_TRANSLATE_ONLY}
-
-
-def _is_rtl(text: str) -> bool:
-    return bool(_RTL_RE.search(text))
+TRANSCRIPTION_DOCX_LANGUAGE = "ar-SA"
+SEPARATOR_LINES = {HEADER_SEPARATOR, FOOTER_SEPARATOR}
 
 
 def _apply_paragraph_bidi(paragraph, is_rtl: bool) -> None:
@@ -47,11 +56,28 @@ def _apply_paragraph_bidi(paragraph, is_rtl: bool) -> None:
     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT if is_rtl else WD_ALIGN_PARAGRAPH.LEFT
 
 
-def _apply_run_bidi(run, is_rtl: bool) -> None:
+def _apply_run_bidi(run, is_rtl: bool, language: str = TRANSCRIPTION_DOCX_LANGUAGE) -> None:
     r_pr = run._r.get_or_add_rPr()
     rtl_element = OxmlElement("w:rtl")
     rtl_element.set(qn("w:val"), "1" if is_rtl else "0")
     r_pr.append(rtl_element)
+    lang_element = OxmlElement("w:lang")
+    lang_element.set(qn("w:val"), language)
+    lang_element.set(qn("w:eastAsia"), language)
+    lang_element.set(qn("w:bidi"), language)
+    r_pr.append(lang_element)
+
+
+def _set_document_language(document: Document, language: str) -> None:
+    normal_style = document.styles["Normal"]
+    r_pr = normal_style.element.get_or_add_rPr()
+    lang_element = r_pr.find(qn("w:lang"))
+    if lang_element is None:
+        lang_element = OxmlElement("w:lang")
+        r_pr.append(lang_element)
+    lang_element.set(qn("w:val"), language)
+    lang_element.set(qn("w:eastAsia"), language)
+    lang_element.set(qn("w:bidi"), language)
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -227,16 +253,20 @@ def _write_txt_zip(path: Path, selected_pages: List[int], page_texts: Dict[int, 
 
 def _build_transcription_docx_buffer(selected_pages: List[int], page_texts: Dict[int, str]) -> io.BytesIO:
     document = Document()
+    _set_document_language(document, TRANSCRIPTION_DOCX_LANGUAGE)
+
     for index, page_number in enumerate(selected_pages):
         lines = page_texts.get(page_number, "").split("\n")
         last_paragraph = None
         for line in lines:
             paragraph = document.add_paragraph()
-            rtl = _is_rtl(line)
-            _apply_paragraph_bidi(paragraph, rtl)
+            is_separator = line.strip() in SEPARATOR_LINES
+            _apply_paragraph_bidi(paragraph, not is_separator)
+            if is_separator:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
             if line:
                 run = paragraph.add_run(line)
-                _apply_run_bidi(run, rtl)
+                _apply_run_bidi(run, not is_separator)
             last_paragraph = paragraph
         if index < len(selected_pages) - 1 and last_paragraph is not None:
             last_paragraph.add_run().add_break(WD_BREAK.PAGE)
