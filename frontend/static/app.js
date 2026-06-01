@@ -4,6 +4,7 @@ const MODE_TRANSLATE_ONLY = "translate_only";
 
 const state = {
     mode: MODE_TRANSCRIBE,
+    thinkingEnabled: true,
     uploadId: null,
     pages: [],
     jobId: null,
@@ -13,6 +14,9 @@ const state = {
 
 const uploadForm = document.getElementById("uploadForm");
 const modeSelect = document.getElementById("modeSelect");
+const thinkingPicker = document.getElementById("thinkingPicker");
+const thinkingEnabled = document.getElementById("thinkingEnabled");
+const thinkingState = document.getElementById("thinkingState");
 const fileInputLabel = document.getElementById("fileInputLabel");
 const documentInput = document.getElementById("documentInput");
 const uploadButton = document.getElementById("uploadButton");
@@ -52,8 +56,18 @@ function modeNeedsPageSelection(mode) {
 }
 
 
+function syncThinkingUI() {
+    state.thinkingEnabled = thinkingEnabled.checked;
+    thinkingState.textContent = state.thinkingEnabled ? "Enabled" : "Disabled";
+}
+
+
 function applyModeUI() {
     state.mode = modeSelect.value;
+    const modeUsesTranscription = modeNeedsPageSelection(state.mode);
+    thinkingPicker.hidden = !modeUsesTranscription;
+    thinkingEnabled.disabled = !modeUsesTranscription;
+    syncThinkingUI();
     if (state.mode === MODE_TRANSLATE_ONLY) {
         fileInputLabel.textContent = "Select DOCX";
         documentInput.accept = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -423,6 +437,7 @@ async function startProcessing() {
             body: JSON.stringify({
                 upload_id: state.uploadId,
                 selected_pages: pages,
+                thinking_enabled: modeNeedsPageSelection(state.mode) ? state.thinkingEnabled : true,
             }),
         });
         const payload = await response.json();
@@ -441,6 +456,7 @@ async function startProcessing() {
 
 uploadForm.addEventListener("submit", uploadDocument);
 modeSelect.addEventListener("change", applyModeUI);
+thinkingEnabled.addEventListener("change", syncThinkingUI);
 
 selectAllButton.addEventListener("click", () => {
     pageGrid.querySelectorAll(".page-checkbox").forEach((checkbox) => {

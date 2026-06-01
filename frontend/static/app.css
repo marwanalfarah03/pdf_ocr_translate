@@ -101,7 +101,8 @@ button,
     align-items: center;
 }
 
-.mode-picker {
+.mode-picker,
+.thinking-picker {
     display: inline-flex;
     align-items: center;
     gap: 12px;
@@ -118,6 +119,43 @@ button,
     color: var(--ink);
     min-width: 280px;
     outline: none;
+}
+
+.thinking-picker input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.toggle-control {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(45, 33, 21, 0.18);
+    transition: background-color 160ms ease;
+}
+
+.toggle-control::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff8f2;
+    box-shadow: 0 2px 8px rgba(45, 33, 21, 0.18);
+    transition: transform 160ms ease;
+}
+
+.thinking-picker input:checked + .toggle-control {
+    background: var(--accent);
+}
+
+.thinking-picker input:checked + .toggle-control::after {
+    transform: translateX(20px);
 }
 
 .file-picker {
@@ -386,6 +424,7 @@ button:disabled {
     }
 
     .mode-picker,
+    .thinking-picker,
     .file-picker,
     button,
     .download-link {

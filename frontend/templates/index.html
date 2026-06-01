@@ -35,6 +35,12 @@
                         <option value="translate_only">Translate Only AR to EN (DOCX)</option>
                     </select>
                 </label>
+                <label id="thinkingPicker" class="thinking-picker" for="thinkingEnabled">
+                    <span>Thinking</span>
+                    <input id="thinkingEnabled" name="thinking_enabled" type="checkbox" checked>
+                    <span class="toggle-control" aria-hidden="true"></span>
+                    <span id="thinkingState">Enabled</span>
+                </label>
                 <label class="file-picker" for="documentInput">
                     <span id="fileInputLabel">Select PDF</span>
                     <input id="documentInput" name="document" type="file" accept="application/pdf" required>

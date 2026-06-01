@@ -89,6 +89,7 @@ class JobRecord:
     upload_id: str
     mode: str
     selected_pages: List[int]
+    thinking_enabled: bool = True
     status: str = "queued"
     error: Optional[str] = None
     current_page: Optional[int] = None
@@ -206,6 +207,7 @@ def get_job_snapshot(job: JobRecord) -> dict:
             "job_id": job.job_id,
             "upload_id": job.upload_id,
             "mode": job.mode,
+            "thinking_enabled": job.thinking_enabled,
             "status": job.status,
             "error": job.error,
             "current_page": job.current_page,
@@ -269,6 +271,7 @@ def _record_history(job: JobRecord, upload: UploadRecord) -> None:
             "upload_id": upload.upload_id,
             "filename": upload.original_name,
             "mode": job.mode,
+            "thinking_enabled": job.thinking_enabled,
             "status": job.status,
             "error": job.error,
             "selected_pages": list(job.selected_pages),
@@ -321,7 +324,12 @@ def _run_transcription_modes(job: JobRecord, upload: UploadRecord, output_dir: P
                 append_event(job, "token", page_number=page_ref, token=token)
 
             text = postprocess_page_text(
-                transcribe_image(jpeg_bytes, on_token=on_token, print_tokens=False)
+                transcribe_image(
+                    jpeg_bytes,
+                    on_token=on_token,
+                    print_tokens=False,
+                    thinking_enabled=job.thinking_enabled,
+                )
             )
             with job.condition:
                 job.page_texts[page_number] = text
@@ -363,7 +371,7 @@ def run_processing_job(job_id: str) -> None:
     with job.condition:
         job.status = "running"
         job.started_at = time.time()
-    append_event(job, "status", status="running", mode=job.mode)
+    append_event(job, "status", status="running", mode=job.mode, thinking_enabled=job.thinking_enabled)
 
     try:
         if job.mode == MODE_TRANSLATE_ONLY:
@@ -509,17 +517,22 @@ def create_job() -> Response:
     else:
         selected_pages = []
 
+    thinking_enabled = True
+    if upload.mode in {MODE_TRANSCRIBE, MODE_TRANSCRIBE_TRANSLATE}:
+        thinking_enabled = payload.get("thinking_enabled") is not False
+
     job_id = uuid4().hex
     job = JobRecord(
         job_id=job_id,
         upload_id=upload.upload_id,
         mode=upload.mode,
         selected_pages=selected_pages,
+        thinking_enabled=thinking_enabled,
     )
     with registry_lock:
         jobs[job_id] = job
 
-    append_event(job, "status", status="queued", mode=job.mode)
+    append_event(job, "status", status="queued", mode=job.mode, thinking_enabled=job.thinking_enabled)
     worker = threading.Thread(target=run_processing_job, args=(job_id,), daemon=True)
     worker.start()
 
@@ -529,6 +542,7 @@ def create_job() -> Response:
             "stream_url": f"/api/jobs/{job_id}/stream",
             "status_url": f"/api/jobs/{job_id}",
             "mode": job.mode,
+            "thinking_enabled": job.thinking_enabled,
         }
     )
 

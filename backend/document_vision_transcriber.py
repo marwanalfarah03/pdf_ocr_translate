@@ -111,6 +111,7 @@ def transcribe_image(
     jpeg_bytes: bytes,
     on_token: Optional[Callable[[str], None]] = None,
     print_tokens: bool = True,
+    thinking_enabled: bool = True,
 ) -> str:
     """Send a page image to vLLM and return the transcription."""
     image_base64 = base64.b64encode(jpeg_bytes).decode("ascii")
@@ -143,6 +144,8 @@ def transcribe_image(
         "temperature": 0,
         "top_p": 1,
     }
+    if not thinking_enabled:
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
 
     req = urllib.request.Request(
         VLLM_URL,
@@ -154,7 +157,7 @@ def transcribe_image(
     full_text: list[str] = []
     raw_text: list[str] = []
     pending_think_text: list[str] = []
-    streaming_started = False
+    streaming_started = not thinking_enabled
 
     try:
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
@@ -189,11 +192,14 @@ def transcribe_image(
 
                 if token:
                     raw_text.append(token)
-                    visible_token, streaming_started = _visible_after_think_token(
-                        token,
-                        pending_think_text,
-                        streaming_started,
-                    )
+                    if thinking_enabled:
+                        visible_token, streaming_started = _visible_after_think_token(
+                            token,
+                            pending_think_text,
+                            streaming_started,
+                        )
+                    else:
+                        visible_token = token
 
                     if not visible_token:
                         continue
