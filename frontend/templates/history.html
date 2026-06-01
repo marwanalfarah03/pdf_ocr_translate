@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Processing History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <style>
+        .history-table-wrap {
+            overflow: auto;
+            border: 1px solid rgba(108, 76, 46, 0.14);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        table.history-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 960px;
+        }
+
+        .history-table th,
+        .history-table td {
+            text-align: left;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(108, 76, 46, 0.1);
+            vertical-align: top;
+        }
+
+        .history-table th {
+            font-family: "Bahnschrift", "Segoe UI Variable Display", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .status-failed {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .status-completed {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .download-chip {
+            display: inline-flex;
+            margin-right: 6px;
+            margin-bottom: 6px;
+            text-decoration: none;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: rgba(176, 74, 47, 0.12);
+            color: var(--accent-strong);
+            font-size: 0.85rem;
+            border: 1px solid rgba(176, 74, 47, 0.18);
+        }
+
+        .history-empty {
+            color: var(--muted);
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero panel">
+            <div>
+                <p class="eyebrow">History</p>
+                <h1>Document processing history</h1>
+                <p class="lede">Review completed and failed jobs, including selected mode, timestamps, and downloadable outputs.</p>
+            </div>
+            <div class="hero-meta">
+                <a class="pill history-link" href="/">Back to Workspace</a>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Records</p>
+                    <h2>Recent jobs</h2>
+                </div>
+                <button id="refreshHistory" type="button">Refresh</button>
+            </div>
+
+            <p id="historyEmpty" class="history-empty" hidden>No jobs yet.</p>
+            <div class="history-table-wrap">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Job ID</th>
+                            <th>File</th>
+                            <th>Mode</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Completed</th>
+                            <th>Downloads</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='history.js') }}" defer></script>
+</body>
+</html>
