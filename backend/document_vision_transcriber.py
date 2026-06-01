@@ -151,7 +151,7 @@ def transcribe_image(
             },
         ],
         "stream": True,
-        "temperature": 0,
+        "temperature": 0.2,
         "top_p": 1,
     }
     if not thinking_enabled:
