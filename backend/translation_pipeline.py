@@ -372,8 +372,8 @@ class VLLMTranslationClient:
                 {"role": "system", "content": self.settings.system_prompt},
                 {"role": "user", "content": user_text},
             ],
-            "temperature": 0.2,
-            "max_tokens": max_tokens,
+            "temperature": 0,
+            # "max_tokens": max_tokens,
         }
 
         for attempt in range(1, self.settings.max_retries + 1):
