@@ -143,9 +143,7 @@ def ensure_storage() -> None:
         TRANSLATION_SETTINGS_PATH.write_text(
             json.dumps(
                 {
-                    "endpoint": "http://localhost:8020",
-                    "model": "/data/models/gpt-oss-120b",
-                    "api_key": "",
+                    "model": "claude-opus-4-8",
                     "batch_word_limit": 250,
                     "timeout": 180,
                     "max_retries": 5,

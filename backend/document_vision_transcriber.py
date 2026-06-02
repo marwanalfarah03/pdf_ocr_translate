@@ -5,20 +5,26 @@ Flexible OCR with vLLM Vision
 from __future__ import annotations
 
 import base64
-import json
+import os
 import re
-import urllib.request
 from typing import Callable, Optional
 
 import fitz  # pip install pymupdf
+from anthropic import AnthropicFoundry
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
-MODEL = "/data/models/Qwen3.5-122B-A10B"
-VLLM_URL = "http://localhost:8018/v1/chat/completions"
+AZURE_ENDPOINT = "https://marwanal-9411-resource.services.ai.azure.com/anthropic"
+DEPLOYMENT_NAME = os.environ.get("VISION_MODEL_NAME", os.environ.get("MODEL_NAME", "claude-opus-4-8"))
 DPI = 200
-REQUEST_TIMEOUT_SECONDS = 600
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _create_vision_client() -> AnthropicFoundry:
+    return AnthropicFoundry(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+        base_url=AZURE_ENDPOINT,
+    )
 
 
 THINK_START_PREFIX = "<think"
@@ -123,131 +129,47 @@ def transcribe_image(
     print_tokens: bool = True,
     thinking_enabled: bool = True,
 ) -> str:
-    """Send a page image to vLLM and return the transcription."""
+    """Send a page image to the Anthropic Foundry model and return the transcription."""
     image_base64 = base64.b64encode(jpeg_bytes).decode("ascii")
-    image_url = f"data:image/jpeg;base64,{image_base64}"
-
-    payload = {
-        "model": MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": FULL_PAGE_PROMPT,
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url,
-                        },
-                    },
-                ],
-            },
-        ],
-        "stream": True,
-        "temperature": 0,
-        "top_p": 1,
-    }
-    if not thinking_enabled:
-        payload["chat_template_kwargs"] = {"enable_thinking": False}
-
-    req = urllib.request.Request(
-        VLLM_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
+    client = _create_vision_client()
     full_text: list[str] = []
-    raw_text: list[str] = []
-    pending_think_text: list[str] = []
-    streaming_started = not thinking_enabled
 
     try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
+        with client.messages.stream(
+            model=DEPLOYMENT_NAME,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": FULL_PAGE_PROMPT},
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": image_base64,
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=8192,
+        ) as stream:
             if print_tokens:
                 print()
-
-            for raw_line in resp:
-                line = raw_line.decode("utf-8", errors="replace").strip()
-
-                if not line:
-                    continue
-
-                if not line.startswith("data:"):
-                    continue
-
-                data = line.removeprefix("data:").strip()
-
-                if data == "[DONE]":
-                    break
-
-                try:
-                    chunk = json.loads(data)
-                except json.JSONDecodeError:
-                    continue
-
-                choices = chunk.get("choices", [])
-                if not choices:
-                    continue
-
-                delta = choices[0].get("delta", {})
-                token = delta.get("content", "")
-
-                if token:
-                    raw_text.append(token)
-                    if thinking_enabled:
-                        if not streaming_started:
-                            if on_think_token is not None:
-                                on_think_token(token)
-                            pending_think_text.append(token)
-                            pending_text = "".join(pending_think_text)
-                            end_index = pending_text.lower().find(THINK_END_TAG)
-                            if end_index >= 0:
-                                streaming_started = True
-                                pending_think_text.clear()
-                                if on_think_done is not None:
-                                    on_think_done()
-                                visible_token = pending_text[end_index + len(THINK_END_TAG):]
-                            else:
-                                continue
-                        else:
-                            visible_token = token
-                    else:
-                        visible_token = token
-
-                    if not visible_token:
-                        continue
-
-                    full_text.append(visible_token)
-
-                    if print_tokens:
-                        print(visible_token, end="", flush=True)
-
-                    if on_token is not None:
-                        on_token(visible_token)
-
+            for token in stream.text_stream:
+                full_text.append(token)
+                if print_tokens:
+                    print(token, end="", flush=True)
+                if on_token is not None:
+                    on_token(token)
             if print_tokens:
                 print()
-
     except Exception as e:
         return f"[ERROR calling model: {e}]"
 
-    if streaming_started:
-        return "".join(full_text).strip()
-
-    raw_output = "".join(raw_text).strip()
-    raw_output_lower = raw_output.lower()
-    if THINK_START_PREFIX in raw_output_lower or THINK_END_TAG in raw_output_lower:
-        return ""
-
-    return raw_output
+    return "".join(full_text).strip()
 
 
 def _normalize_separator_lines(text: str) -> str:

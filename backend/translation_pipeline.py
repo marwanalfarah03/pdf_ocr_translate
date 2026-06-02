@@ -9,8 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List
 
-import requests
+from anthropic import AnthropicFoundry
 from lxml import etree
+
+AZURE_ENDPOINT = "https://marwanal-9411-resource.services.ai.azure.com/anthropic"
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 XML_NS = "http://www.w3.org/XML/1998/namespace"
@@ -357,38 +359,25 @@ def build_translated_docx(input_path: Path, output_path: Path, translations_by_i
 class VLLMTranslationClient:
     def __init__(self, settings: TranslationSettings):
         self.settings = settings
-        self.url = settings.endpoint.rstrip("/") + "/v1/chat/completions"
-        self.session = requests.Session()
-        if settings.api_key:
-            self.session.headers.update({"Authorization": f"Bearer {settings.api_key}"})
+        self.client = AnthropicFoundry(
+            api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+            base_url=AZURE_ENDPOINT,
+        )
 
     def close(self) -> None:
-        self.session.close()
+        pass
 
     def _call(self, user_text: str, max_tokens: int, call_kind: str) -> str:
-        payload = {
-            "model": self.settings.model,
-            "messages": [
-                {"role": "system", "content": self.settings.system_prompt},
-                {"role": "user", "content": user_text},
-            ],
-            "temperature": 0,
-            # "max_tokens": max_tokens,
-        }
-
         for attempt in range(1, self.settings.max_retries + 1):
             try:
-                response = self.session.post(self.url, json=payload, timeout=self.settings.timeout)
-                response.raise_for_status()
-                body = response.json()
-                choices = body.get("choices")
-                if not choices or not isinstance(choices, list):
-                    raise ValueError(f"Invalid response for {call_kind}: missing choices")
-                content = choices[0].get("message", {}).get("content")
-                if content is None:
-                    raise ValueError(f"Invalid response for {call_kind}: missing content")
-                return str(content).strip()
-            except requests.RequestException:
+                response = self.client.messages.create(
+                    model=self.settings.model,
+                    system=self.settings.system_prompt,
+                    messages=[{"role": "user", "content": user_text}],
+                    max_tokens=max_tokens,
+                )
+                return response.content[0].text.strip()
+            except Exception:
                 if attempt == self.settings.max_retries:
                     raise
                 time.sleep(2 ** attempt)
@@ -457,9 +446,9 @@ class VLLMTranslationClient:
 
 def load_translation_settings(settings_path: Path) -> TranslationSettings:
     defaults = {
-        "endpoint": os.environ.get("TRANSLATION_ENDPOINT", "http://localhost:8020"),
-        "model": os.environ.get("TRANSLATION_MODEL", "/data/models/gpt-oss-120b"),
-        "api_key": os.environ.get("TRANSLATION_API_KEY", ""),
+        "endpoint": os.environ.get("TRANSLATION_ENDPOINT", AZURE_ENDPOINT),
+        "model": os.environ.get("TRANSLATION_MODEL", os.environ.get("MODEL_NAME", "claude-opus-4-8")),
+        "api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
         "batch_word_limit": int(os.environ.get("TRANSLATION_BATCH_WORD_LIMIT", "250")),
         "timeout": int(os.environ.get("TRANSLATION_TIMEOUT", "180")),
         "max_retries": int(os.environ.get("TRANSLATION_MAX_RETRIES", "5")),
